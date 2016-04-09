@@ -164,4 +164,46 @@ describe('usage of the library in the real world scenarios', function () {
 			});
 		});
 	});
+    
+	context('diamond dependencies', function () {
+		it('should work', function() {
+            var dependenciesCount = 3;
+            var updatesCount = 3;
+            
+            var x = [];
+            for (var j = 0; j < dependenciesCount; j++) {
+                x.push(itDepends.value(j));
+            }
+
+            var a = itDepends.computed(function() {
+                var z = 0;
+                for (var j = 0; j < dependenciesCount; j++) {
+                    z += x[j]();
+                }
+                return z;
+            });
+
+            var b = itDepends.computed(function() {
+                return a();
+            });
+
+            var c = itDepends.computed(function() {
+                return a();
+            });
+
+            var d = itDepends.value(-1);
+
+            var e = itDepends.computed(function() {
+                return d() % 2 == 0 ? b() : c();
+            });
+
+            var s = e.onChange(function(){
+                
+            });
+            
+            for (var j = 0; j < updatesCount; j++) {
+                d.write(j);
+            }
+		});
+    });
 });

@@ -2,6 +2,7 @@
 
 import changeNotification from './changeNotification';
 import { valueChanged } from './bulkChange';
+import { doChange } from './change';
 import * as tracking from './tracking';
 import { default as subscriptionList, ISubscription, IChangeHandler, ISubscriptions, IHasValue } from './subscriptionList';
 
@@ -36,7 +37,9 @@ export default function<T>(initialValue: T): IValue<T> {
         currentValue = newValue;
         tracking.lastWriteVersion++;
 
-        valueChanged(id, self, oldValue, notifySubscribers);
+        doChange(() => {
+            valueChanged(id, self, oldValue, notifySubscribers);
+        });
     };
 
     self.onChange = function(handler: IChangeHandler<T>): ISubscription {

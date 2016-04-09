@@ -49,6 +49,10 @@ module.exports = function(updatesCount, dependenciesCount) {
             var e = ko.pureComputed(function() {
                 return d() % 2 == 0 ? b() : c();
             });
+
+            var s = e.subscribe(function(){
+                
+            });
             
             return d;
         }

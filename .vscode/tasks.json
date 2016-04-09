@@ -18,9 +18,13 @@
             ]
         },
         {
-            "taskName": "unit-tests-only",
+            "taskName": "unit-tests",
             "args": [],
             "isTestCommand": true
+        },
+        {
+            "taskName": "performance-tests",
+            "args": []
         }
     ]
 }

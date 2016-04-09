@@ -3,6 +3,7 @@
 import * as tracking from './tracking';
 import { default as subscriptionList, ISubscription, ISubscriptions, IHasValue } from './subscriptionList';
 import { valueChanged } from './bulkChange';
+import { onChangeFinished } from './change';
 
 export interface ICalculator<T> {
     (params: any[]): T;
@@ -47,29 +48,26 @@ export default function<T>(calculator: ICalculator<T>, args: any[], writeCallbac
     var self: IComputed<T>;
 
     var atLeastOneDependencyChanged = function(): boolean {
-        for (var i = 0; i < dependencies.length; i++) {
-            var dependency = dependencies[i];
-
-            if (dependency.observableValue() !== dependency.capturedValue) {
-                return true;
+        return tracking.executeWithTracker(() => {
+            for (var dependency of dependencies) {
+                if (dependency.observableValue() !== dependency.capturedValue) {
+                    return true;
+                }
             }
-        }
 
-        return false;
+            return false;
+        });
     };
 
     var unsubscribeDependencies = function(): void {
-        for (var i = 0; i < dependencies.length; i++) {
-            var dependency = dependencies[i];
+        for (var dependency of dependencies) {
             dependency.subscription.disable();
             dependency.subscription = undefined;
         }
     };
 
     var subscribeDependencies = function(): void {
-        for (var i = 0; i < dependencies.length; i++) {
-            var dependency = dependencies[i];
-
+        for (var dependency of dependencies) {
             dependency.subscription = dependency.observableValue.onChange(self);
         }
     };
@@ -92,60 +90,53 @@ export default function<T>(calculator: ICalculator<T>, args: any[], writeCallbac
                 var oldDependencies = dependencies;
                 dependencies = [];
 
-                tracking
-                    .trackingWith(function(dependencyId: number, observableValue: any, capturedValue: any): void {
-                        if (dependenciesById[dependencyId]) {
-                            return;
-                        }
+                if (subscriptionsActive) {
+                    oldValue = currentValue;
+                }
 
-                        var dependency = {
-                            capturedValue: capturedValue,
-                            dependencyId: dependencyId,
-                            observableValue: observableValue
-                        };
+                var tracker = function(dependencyId: number, observableValue: any, capturedValue: any): void {
+                    if (dependenciesById[dependencyId] !== undefined) {
+                        return;
+                    }
 
-                        dependenciesById[dependencyId] = dependency;
-                        dependencies.push(dependency);
-                    })
-                    .execute(function(): void {
-                        if (subscriptionsActive) {
-                            oldValue = currentValue;
-                        }
+                    var dependency = {
+                        capturedValue: capturedValue,
+                        dependencyId: dependencyId,
+                        observableValue: observableValue
+                    };
 
-                        currentValue = calculator.apply(undefined, args);
-                    });
+                    dependenciesById[dependencyId] = dependency;
+                    dependencies.push(dependency);
+                };
+
+                currentValue = tracking.executeWithTracker(() => calculator.apply(undefined, args), tracker);
 
                 if (subscriptionsActive) {
                     if (oldDependencies) {
-                        for (var i = 0; i < oldDependencies.length; i++) {
-                            var oldDependency = oldDependencies[i];
+                        for (var oldDependency of oldDependencies) {
                             var newDependency = dependenciesById[oldDependency.dependencyId];
 
-                            if (newDependency) {
+                            if (newDependency !== undefined) {
                                 newDependency.subscription = oldDependency.subscription;
                             }
                         }
                     }
 
-                    for (var i = 0; i < dependencies.length; i++) {
-                        var dependency = dependencies[i];
+                    for (var dependency of dependencies) {
                         dependency.subscription = dependency.subscription || dependency.observableValue.onChange(self);
                     }
 
                     if (oldDependencies) {
-                        for (var i = 0; i < oldDependencies.length; i++) {
-                            var oldDependency = oldDependencies[i];
-                            var newDependency = dependenciesById[oldDependency.dependencyId];
+                        onChangeFinished(() => {
+                            for (var oldDependency of oldDependencies) {
+                                var newDependency = dependenciesById[oldDependency.dependencyId];
 
-                            if (!newDependency) {
-                                oldDependency.subscription.disable();
+                                if (newDependency === undefined) {
+                                    oldDependency.subscription.disable();
+                                }
                             }
-                        }
-
-                        oldDependencies = undefined;
+                        });
                     }
-
-                    dependenciesById = undefined;
 
                     if (oldValue !== currentValue) {
                         valueChanged(id, self, oldValue, notifySubscribers);

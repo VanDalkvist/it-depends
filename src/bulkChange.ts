@@ -1,65 +1,67 @@
 'use strict';
 
 import { IHasValue } from './subscriptionList';
+import { doChange } from './change';
 
 interface IChange<T> {
     value: IHasValue<T>;
-    notify(): void;
+    oldValue: T;
+    newValue?: T;
+    notify(from: T, to: T): void;
 }
 
-interface IChanges {
-    [id: number]: IChange<any>;
-    ids: number[];
+interface IHasChanges {
+    [id: number]: boolean;
 }
 
 var bulkLevels: number = 0;
-var changes: IChanges;
+var changes: IChange<any>[];
+var hasChange: IHasChanges;
 
 export function valueChanged<T>(id: number, value: IHasValue<T>, oldValue: T, notify: (from: T, to: T) => void): void {
     if (bulkLevels === 0) {
         notify(oldValue, value());
-    } else if (!changes[id]) {
-        changes.ids.push(id);
+    } else if (hasChange[id] === undefined) {
+        changes.push({
+            notify: notify,
+            value: value,
+            oldValue: oldValue
+        });
 
-        changes[id] = {
-            notify: function(): void {
-                var newValue = value();
-                if (oldValue !== newValue) {
-                    notify(oldValue, newValue);
-                }
-            },
-            value: value
-        };
+        hasChange[id] = true;
     }
 }
 
 export default function(changeAction: () => void): void {
     var isFirstBulk = bulkLevels === 0;
+
     if (isFirstBulk) {
-        changes = {
-            ids: []
-        };
+        changes = [];
+        hasChange = {};
     }
 
     bulkLevels++;
 
     try {
-        changeAction();
+        doChange(changeAction);
     } finally {
         if (isFirstBulk) {
-            for (var id of changes.ids) {
-                changes[id].value();
+            for (var change of changes) {
+                change.newValue = change.value();
             }
         }
 
         bulkLevels--;
 
         if (isFirstBulk) {
-            for (var id of changes.ids) {
-                changes[id].notify();
+            for (var change of changes) {
+                if (change.oldValue !== change.newValue) {
+                    change.notify(change.oldValue, change.newValue);
+                }
             }
 
             changes = undefined;
+            hasChange = undefined;
         }
     }
 }
