@@ -6,4 +6,4 @@ before_script:
   - npm install -g gulp
 script: gulp
 env:
-  SKIP_COVERAGE=true
+  SKIP_COVERAGE='True'
