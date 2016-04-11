@@ -1,9 +1,0 @@
-language: node_js
-node_js:
-  - "5"
-  - "0.12"
-before_script:
-  - npm install -g gulp
-script: gulp
-env:
-  SKIP_COVERAGE='True'
